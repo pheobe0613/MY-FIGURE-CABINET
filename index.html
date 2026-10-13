@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1512">
+<script>
+  (function(){ var t; try{ t = localStorage.getItem('figure-theme'); }catch(e){}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t; })();
+</script>
+<title>公仔收藏櫃</title>
+<style>
+  :root{
+    --bg:#1b1512; --card:#2a211b; --card2:#332820;
+    --wood:#7a4f2e; --wood-dark:#553420; --wood-light:#a8743f;
+    --text:#f4ebe1; --muted:#b4a292; --line:rgba(255,255,255,.09);
+    --c:#e8a05c; /* 目前櫃子的主題色 */
+    --cols:3;
+    color-scheme:dark;
+    --case-top:#2b2019; --case-bot:#1f1813; --case-inset:rgba(0,0,0,.65);
+    --slot-bg:rgba(0,0,0,.25); --dash:rgba(255,255,255,.1); --dash-text:rgba(255,255,255,.2);
+    --dot:rgba(255,255,255,.2); --input:#1f1813; --backdrop:rgba(10,7,5,.65);
+    --toast-bg:#f4ebe1; --toast-fg:#1b1512; --danger:#ff8a80; --sell-text:#ffab9e;
+    --shadow:rgba(0,0,0,.5);
+  }
+  /* ---------- 淺色版 ---------- */
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#fbf8f1; --card:#fffdf8; --card2:#f3ede3;   /* 奶白牆面 */
+    --wood:#e3c9a3; --wood-dark:#cfae84; --wood-light:#f3e3c8; /* 淺色木頭（楓木 / 樺木感） */
+    --text:#3a2a20; --muted:#8f7b6b; --line:rgba(90,65,40,.12);
+    --case-top:#fffdf9; --case-bot:#f6efe4; --case-inset:rgba(150,110,70,.13);
+    --slot-bg:rgba(150,110,70,.07); --dash:rgba(140,105,70,.25); --dash-text:rgba(140,105,70,.45);
+    --dot:rgba(140,105,70,.22); --input:#fdfaf4; --backdrop:rgba(70,50,30,.28);
+    --toast-bg:#3a2a20; --toast-fg:#fbf8f1; --danger:#c0392b; --sell-text:#b4442f;
+    --shadow:rgba(120,85,50,.16);
+  }
+  /* 淺色版牆面維持奶白，只帶一點點櫃子主題色 */
+  :root[data-theme="light"] body{
+    background:var(--bg);
+  }
+  @media (min-width:600px){ :root{ --cols:4; } }
+  @media (min-width:900px){ :root{ --cols:5; } }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--c) 14%, var(--bg)) 0%, var(--bg) 60%);
+    background-color:var(--bg);
+    color:var(--text);
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,sans-serif;
+    display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+    transition:background .4s, color .3s;
+  }
+  .appbar .right{ display:flex; gap:2px; }
+  button{ font:inherit; color:inherit; cursor:pointer; }
+
+  /* ---------- 頂部 ---------- */
+  .appbar{ display:flex; align-items:center; justify-content:space-between;
+    padding:calc(8px + env(safe-area-inset-top)) 16px 0; }
+  .brand{ font-size:13px; letter-spacing:.12em; color:var(--muted); }
+  .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:transparent;
+    font-size:22px; display:grid; place-items:center; }
+  .icon-btn:hover{ background:var(--line); }
+
+  .titlebar{ display:grid; grid-template-columns:44px 1fr 44px; align-items:center; padding:2px 8px 0; }
+  .nav{ width:44px; height:44px; border:none; background:transparent; font-size:30px; line-height:1;
+    color:var(--muted); border-radius:50%; }
+  .nav:hover:not(:disabled){ background:var(--line); color:var(--text); }
+  .nav:disabled{ opacity:.2; cursor:default; }
+  .title-wrap{ text-align:center; min-width:0; }
+  #ipTitle{ margin:0; font-size:clamp(22px,6vw,32px); font-weight:800; letter-spacing:.04em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #ipTitle::after{ content:""; display:block; width:42px; height:4px; border-radius:2px;
+    background:var(--c); margin:6px auto 0; transition:background .4s; }
+  #ipTitle.swap{ animation:fadeIn .35s ease; }
+  @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none;} }
+  .sub{ font-size:12px; color:var(--muted); margin-top:4px; min-height:1em; }
+
+  .dots{ display:flex; justify-content:center; gap:6px; padding:10px 0 6px; min-height:20px; flex-wrap:wrap; }
+  .dot{ width:7px; height:7px; border-radius:4px; background:var(--dot); border:none; padding:0;
+    transition:width .25s, background .25s; }
+  .dot.on{ width:20px; background:var(--c); }
+
+  /* ---------- 左右滑動的櫃子 ---------- */
+  .track{ flex:1; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
+    scrollbar-width:none; overscroll-behavior-x:contain; }
+  .track::-webkit-scrollbar{ display:none; }
+  .panel{ flex:0 0 100%; scroll-snap-align:center; scroll-snap-stop:always; overflow-y:auto;
+    padding:6px 14px calc(110px + env(safe-area-inset-bottom)); }
+
+  .case{
+    position:relative; max-width:980px; margin:0 auto; padding:26px 10px 10px;
+    border:10px solid var(--wood); border-top-width:16px; border-radius:16px 16px 8px 8px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 16%, var(--case-top)) 0%, var(--case-bot) 100%);
+    box-shadow:inset 0 0 50px var(--case-inset), inset 0 0 0 1px rgba(255,255,255,.04), 0 24px 40px var(--shadow);
+  }
+  .case::before{ /* 櫃頂燈光 */
+    content:""; position:absolute; left:8%; right:8%; top:0; height:120px; pointer-events:none;
+    background:radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--c) 40%, #fff6e0) 0%, transparent 70%);
+    opacity:.22;
+  }
+  .case::after{ /* 玻璃反光 */
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:6px;
+    background:linear-gradient(115deg, transparent 38%, rgba(255,255,255,.05) 44%, transparent 52%);
+  }
+  .grid{ display:grid; grid-template-columns:repeat(var(--cols),1fr); row-gap:20px; column-gap:0; position:relative; }
+  .slot{ display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .fig{
+    width:calc(100% - 14px); aspect-ratio:3/4; border:none; padding:0; border-radius:8px; overflow:hidden;
+    background:var(--slot-bg); box-shadow:0 10px 14px var(--shadow); transition:transform .2s, box-shadow .2s;
+    display:grid; place-items:center;
+  }
+  .fig img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .fig:hover{ transform:translateY(-4px); box-shadow:0 16px 20px var(--shadow); }
+  .fig .noimg{ font-size:34px; opacity:.6; }
+  .plank{ align-self:stretch; height:12px; margin-top:-2px;
+    background:linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 45%, var(--wood-dark) 100%);
+    box-shadow:0 7px 10px var(--shadow); }
+  .name{ font-size:12px; color:var(--muted); margin-top:7px; padding:0 4px; text-align:center; max-width:100%;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:1.3em; }
+  .fig{ position:relative; }
+  .slot.sold .fig img{ filter:grayscale(.5) brightness(.78); }
+  .sold-tag{ /* 櫃子上的賣出牌 */
+    position:absolute; left:50%; bottom:10px; transform:translateX(-50%) rotate(-4deg);
+    max-width:92%; padding:4px 8px 3px; border-radius:5px; text-align:center; line-height:1.25;
+    background:linear-gradient(#fbf3e6,#efe1cb); color:#8a2f22; border:1.5px solid #b4442f;
+    box-shadow:0 4px 8px rgba(0,0,0,.45); pointer-events:none;
+  }
+  .sold-tag b{ display:block; font-size:11px; letter-spacing:.08em; white-space:nowrap; }
+  .sold-tag small{ display:block; font-size:10px; color:#6b4a3a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .slot.empty .fig{ background:transparent; box-shadow:none; border:2px dashed var(--dash);
+    color:var(--dash-text); font-size:26px; }
+  .slot.empty .fig:hover{ border-color:color-mix(in srgb, var(--c) 60%, transparent); color:var(--c); transform:none; }
+
+  .welcome{ max-width:420px; margin:12vh auto 0; text-align:center; color:var(--muted); line-height:1.8; }
+  .welcome .big{ font-size:56px; }
+
+  .fab{ position:fixed; right:20px; bottom:calc(22px + env(safe-area-inset-bottom)); width:58px; height:58px;
+    border-radius:50%; border:none; background:var(--c); color:#1b1512; font-size:30px; font-weight:700;
+    box-shadow:0 10px 24px var(--shadow); transition:transform .15s, background .4s; }
+  .fab:active{ transform:scale(.94); }
+  .fab[hidden]{ display:none; }
+
+  /* ---------- 對話框 ---------- */
+  dialog{ border:none; padding:0; border-radius:20px; background:var(--card); color:var(--text);
+    width:min(520px,94vw); max-height:92dvh; box-shadow:0 30px 60px var(--shadow); }
+  dialog::backdrop{ background:var(--backdrop); backdrop-filter:blur(4px); }
+  .dlg{ padding:20px; overflow-y:auto; max-height:92dvh; }
+  .dlg h2{ margin:0 0 14px; font-size:19px; }
+  .row-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap; }
+  .btn{ border:none; border-radius:12px; padding:10px 18px; background:var(--card2); }
+  .btn:hover{ filter:brightness(1.15); }
+  .btn.primary{ background:var(--c); color:#1b1512; font-weight:700; }
+  .btn.danger{ background:transparent; color:var(--danger); margin-right:auto; }
+
+  label.f{ display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; }
+  input.t, select.t, textarea.t{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--input); color:var(--text); font:inherit; font-size:16px; }
+  textarea.t{ resize:vertical; min-height:70px; }
+  input.t:focus, select.t:focus, textarea.t:focus{ outline:2px solid color-mix(in srgb, var(--c) 70%, transparent); border-color:transparent; }
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .photo-pick{ display:grid; place-items:center; aspect-ratio:4/3; border-radius:14px; overflow:hidden;
+    border:2px dashed var(--dash); background:var(--input); color:var(--muted); cursor:pointer; position:relative; }
+  .photo-pick img{ width:100%; height:100%; object-fit:contain; display:none; background:#000; }
+  .photo-pick.has img{ display:block; }
+  .photo-pick.has .ph{ display:none; }
+  .photo-pick .ph{ text-align:center; line-height:1.7; }
+  .photo-pick .ph b{ font-size:34px; display:block; }
+  .photo-pick.has::after{ content:"點一下換照片"; position:absolute; bottom:8px; right:8px; font-size:12px;
+    background:rgba(0,0,0,.6); padding:4px 8px; border-radius:8px; }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .chip{ border:1px solid var(--line); background:transparent; border-radius:999px; padding:5px 11px; font-size:13px; color:var(--muted); }
+  .chip.on{ background:var(--c); border-color:var(--c); color:#1b1512; font-weight:600; }
+
+  .swatches{ display:flex; gap:10px; flex-wrap:wrap; }
+  .sw{ width:34px; height:34px; border-radius:50%; border:3px solid transparent; padding:0; }
+  .sw.on{ border-color:var(--text); }
+
+  /* 收藏詳情 */
+  #detailDlg{ width:min(560px,96vw); }
+  .d-photo{ background:#000; display:grid; place-items:center; max-height:58dvh; overflow:hidden; border-radius:20px 20px 0 0; }
+  .d-photo img{ max-width:100%; max-height:58dvh; object-fit:contain; display:block; }
+  .d-body{ padding:16px 20px 20px; }
+  .d-name{ margin:0; font-size:22px; }
+  .d-tag{ display:inline-block; margin-top:6px; font-size:12px; padding:3px 10px; border-radius:999px;
+    background:color-mix(in srgb, var(--c) 25%, transparent); color:color-mix(in srgb, var(--c) 55%, var(--text)); }
+  dl.info{ display:grid; grid-template-columns:auto 1fr; gap:10px 16px; margin:16px 0 0; }
+  dl.info dt{ color:var(--muted); font-size:13px; padding-top:2px; white-space:nowrap; }
+  dl.info dd{ margin:0; white-space:pre-wrap; word-break:break-word; }
+  .days{ color:var(--muted); font-size:13px; }
+  .d-sold{ display:flex; align-items:center; gap:12px; margin-top:14px; padding:10px 14px; border-radius:12px;
+    background:linear-gradient(#fbf3e6,#efe1cb); color:#8a2f22; border:1.5px solid #b4442f; }
+  .d-sold .ic{ font-size:22px; }
+  .d-sold b{ display:block; font-size:14px; letter-spacing:.06em; }
+  .d-sold span{ font-size:13px; color:#6b4a3a; }
+  .d-sold[hidden]{ display:none; }
+  .btn.sell{ background:transparent; border:1px solid #b4442f; color:var(--sell-text); }
+
+  .menu-list{ display:flex; flex-direction:column; gap:4px; }
+  .menu-list button{ text-align:left; border:none; background:transparent; padding:12px 12px; border-radius:10px; font-size:15px; }
+  .menu-list button:hover:not(:disabled){ background:var(--card2); }
+  .menu-list button:disabled{ opacity:.35; cursor:default; }
+  .menu-list hr{ border:none; border-top:1px solid var(--line); margin:6px 0; }
+  .menu-list .warn{ color:var(--danger); }
+
+  .toast{ position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:var(--toast-bg); color:var(--toast-fg); padding:10px 18px; border-radius:999px; font-size:14px; opacity:0;
+    pointer-events:none; transition:.25s; z-index:10; white-space:nowrap; }
+  .toast.show{ opacity:1; transform:translateX(-50%); }
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <span class="brand">MY FIGURE CABINET</span>
+  <div class="right">
+    <button class="icon-btn" id="themeBtn" aria-label="切換淺色 / 深色">☀️</button>
+    <button class="icon-btn" id="menuBtn" aria-label="選單">⋯</button>
+  </div>
+</div>
+<div class="titlebar">
+  <button class="nav" id="prevBtn" aria-label="上一個櫃子">‹</button>
+  <div class="title-wrap">
+    <h1 id="ipTitle">公仔收藏櫃</h1>
+    <div class="sub" id="ipCount"></div>
+  </div>
+  <button class="nav" id="nextBtn" aria-label="下一個櫃子">›</button>
+</div>
+<div class="dots" id="dots"></div>
+
+<main class="track" id="track"></main>
+
+<button class="fab" id="fab" aria-label="新增收藏" hidden>＋</button>
+<div class="toast" id="toast"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<!-- 收藏詳情 -->
+<dialog id="detailDlg">
+  <div class="d-photo"><img id="dImg" alt=""></div>
+  <div class="d-body">
+    <h2 class="d-name" id="dName"></h2>
+    <span class="d-tag" id="dCab"></span>
+    <div class="d-sold" id="dSold" hidden>
+      <span class="ic">🏷️</span>
+      <div><b>忍痛賣出</b><span id="dSoldText"></span></div>
+    </div>
+    <dl class="info" id="dInfo"></dl>
+    <div class="row-btns">
+      <button class="btn danger" id="dDelete" type="button">從櫃子拿下</button>
+      <button class="btn sell" id="dSell" type="button">💔 忍痛賣出</button>
+      <button class="btn" type="button" data-close>關閉</button>
+      <button class="btn primary" id="dEdit" type="button">編輯</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- 忍痛賣出 -->
+<dialog id="sellDlg">
+  <form class="dlg" id="sellForm" autocomplete="off">
+    <h2 id="sfTitle">忍痛賣出 💔</h2>
+    <p class="days" id="sellWho" style="margin:-6px 0 4px"></p>
+    <div class="two">
+      <div>
+        <label class="f" for="sMonth">賣出月份</label>
+        <input class="t" id="sMonth" name="month" type="month" required placeholder="2026-10">
+      </div>
+      <div>
+        <label class="f" for="sPrice">賣出金額</label>
+        <input class="t" id="sPrice" name="price" required placeholder="例如：NT$1,500">
+      </div>
+    </div>
+    <p class="days" style="margin:12px 0 0">賣出後公仔還會留在櫃子上，掛上一塊賣出牌當作紀念。</p>
+    <div class="row-btns">
+      <button class="btn danger" type="button" id="sUndo">取消賣出</button>
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn primary" type="submit">確定賣出</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 新增 / 編輯收藏 -->
+<dialog id="figDlg">
+  <form class="dlg" id="figForm" autocomplete="off">
+    <h2 id="ffTitle">新增收藏</h2>
+    <div class="photo-pick" id="photoPick" tabindex="0" role="button" aria-label="選擇照片">
+      <img id="photoPreview" alt="">
+      <div class="ph"><b>📷</b>點一下選擇照片</div>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" hidden>
+
+    <label class="f" for="fName">名稱</label>
+    <input class="t" id="fName" name="name" required placeholder="例如：初音未來 魔法未來2025 Ver.">
+
+    <div class="two">
+      <div>
+        <label class="f" for="fCab">放在哪個櫃子</label>
+        <select class="t" id="fCab" name="cabinet"></select>
+      </div>
+      <div>
+        <label class="f" for="fDate">入手日期</label>
+        <input class="t" id="fDate" name="date" type="date">
+      </div>
+    </div>
+
+    <label class="f" for="fMethod">怎麼取得的</label>
+    <div class="chips" id="methodChips"></div>
+    <input class="t" id="fMethod" name="method" placeholder="點上面選，或自己輸入">
+
+    <div class="two">
+      <div>
+        <label class="f" for="fPlace">在哪裡入手（選填）</label>
+        <input class="t" id="fPlace" name="place" placeholder="例如：秋葉原 Animate">
+      </div>
+      <div>
+        <label class="f" for="fPrice">價格（選填）</label>
+        <input class="t" id="fPrice" name="price" placeholder="例如：NT$1,280">
+      </div>
+    </div>
+
+    <label class="f" for="fNote">小故事 / 備註（選填）</label>
+    <textarea class="t" id="fNote" name="note" placeholder="抽了 8 次才抽到、朋友從日本帶回來…"></textarea>
+
+    <div class="row-btns">
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn primary" type="submit" id="figSave">放上櫃子</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 新增 / 編輯櫃子 -->
+<dialog id="cabDlg">
+  <form class="dlg" id="cabForm" autocomplete="off">
+    <h2 id="cfTitle">新增櫃子</h2>
+    <label class="f" for="cName">動漫 IP 名稱</label>
+    <input class="t" id="cName" name="name" required placeholder="例如：鬼滅之刃、排球少年、初音未來">
+    <label class="f">櫃子顏色</label>
+    <div class="swatches" id="swatches"></div>
+    <div class="row-btns">
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn primary" type="submit">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 選單 -->
+<dialog id="menuDlg">
+  <div class="dlg">
+    <div class="menu-list">
+      <button data-act="addCab">➕ 新增櫃子</button>
+      <button data-act="editCab" data-need>✏️ 編輯這個櫃子</button>
+      <button data-act="moveLeft" data-need>⬅️ 這個櫃子往前移</button>
+      <button data-act="moveRight" data-need>➡️ 這個櫃子往後移</button>
+      <hr>
+      <button data-act="export">💾 匯出備份</button>
+      <button data-act="import">📂 匯入備份</button>
+      <hr>
+      <button data-act="delCab" data-need class="warn">🗑️ 刪除這個櫃子</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const today = () => new Date().toLocaleDateString('sv-SE');
+  const COLORS = ['#e8a05c','#ef6f7b','#5fa8ef','#8fc66f','#b98ae8','#4fc1c9','#e7c35a','#f78fb3'];
+  const METHODS = ['官方商店','一般店購入','預購','一番賞','扭蛋 / 盒玩','夾娃娃','二手','展覽 / 活動限定','網拍代購','朋友送的'];
+
+  /* ---------- 資料庫（IndexedDB，照片也存在瀏覽器裡） ---------- */
+  let db = null;
+  const mem = { cabinets:new Map(), figures:new Map() }; // IndexedDB 不能用時的備援
+
+  function openDB(){
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('figure-cabinet', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('cabinets')) d.createObjectStore('cabinets', { keyPath:'id' });
+        if (!d.objectStoreNames.contains('figures')) d.createObjectStore('figures', { keyPath:'id' }).createIndex('cabinetId','cabinetId');
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  function tx(store, mode, fn){
+    return new Promise((res, rej) => {
+      const t = db.transaction(store, mode);
+      let out; const req = fn(t.objectStore(store));
+      if (req) req.onsuccess = () => { out = req.result; };
+      t.oncomplete = () => res(out);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
+  }
+  const getAll = st => db ? tx(st,'readonly', s => s.getAll()) : Promise.resolve([...mem[st].values()]);
+  const put = (st, v) => db ? tx(st,'readwrite', s => s.put(v)) : (mem[st].set(v.id, v), Promise.resolve());
+  const del = (st, k) => db ? tx(st,'readwrite', s => s.delete(k)) : (mem[st].delete(k), Promise.resolve());
+
+  /* ---------- 狀態 ---------- */
+  let cabinets = [], figures = [], cur = 0, lastCols = 0;
+  const urls = new Map();
+
+  async function load(){
+    cabinets = (await getAll('cabinets')).sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+    figures = await getAll('figures');
+  }
+  function photoURL(f){
+    if (!f || !f.photo) return '';
+    let u = urls.get(f.id);
+    if (!u || u.blob !== f.photo){
+      if (u) URL.revokeObjectURL(u.url);
+      u = { blob:f.photo, url:URL.createObjectURL(f.photo) };
+      urls.set(f.id, u);
+    }
+    return u.url;
+  }
+  function dropURL(id){ const u = urls.get(id); if (u){ URL.revokeObjectURL(u.url); urls.delete(id); } }
+  const isSold = f => !!(f && f.soldMonth);
+  function fmtMonth(s){ if (!s) return ''; const [y,m] = s.split('-').map(Number); return `${y} 年 ${m} 月`; }
+  function fmtMonthShort(s){ if (!s) return ''; const [y,m] = s.split('-'); return `${y}/${m}`; }
+  function normMonth(s){ // 不支援 type=month 的瀏覽器會變成文字框，這裡把 2026/10、2026.10 之類整理成 2026-10
+    const m = String(s || '').trim().match(/^(\d{4})\D+(\d{1,2})$/);
+    if (!m || +m[2] < 1 || +m[2] > 12) return '';
+    return `${m[1]}-${m[2].padStart(2,'0')}`;
+  }
+  const figsOf = cid => figures.filter(f => f.cabinetId === cid)
+    .sort((a,b) => (a.date || '').localeCompare(b.date || '') || (a.created || 0) - (b.created || 0));
+  const cols = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cols')) || 3;
+
+  /* ---------- 畫面 ---------- */
+  const track = $('#track');
+
+  function render(){
+    lastCols = cols();
+    if (!cabinets.length){
+      track.innerHTML = `<section class="panel"><div class="welcome">
+        <div class="big">🧸</div>
+        <p>還沒有任何櫃子。<br>先為你喜歡的動漫 IP 建一個收納櫃吧！</p>
+        <button class="btn primary" id="firstCab">建立第一個櫃子</button></div></section>`;
+      $('#firstCab').onclick = () => openCabinetForm();
+      cur = 0; updateHeader(); return;
+    }
+    cur = Math.max(0, Math.min(cur, cabinets.length - 1));
+    track.innerHTML = cabinets.map(c => {
+      const fs = figsOf(c.id), n = lastCols;
+      const total = Math.max(n * 2, Math.ceil((fs.length + 1) / n) * n); // 至少兩層，且永遠留一格空位
+      let html = fs.map(f => `<div class="slot${isSold(f) ? ' sold' : ''}">
+          <button class="fig" data-fig="${f.id}" aria-label="${esc(f.name)}${isSold(f) ? '（已賣出）' : ''}">
+            ${f.photo ? `<img src="${photoURL(f)}" alt="" loading="lazy">` : `<span class="noimg">🧸</span>`}
+            ${isSold(f) ? `<span class="sold-tag"><b>忍痛賣出</b><small>${esc(fmtMonthShort(f.soldMonth))}${f.soldPrice ? ' · ' + esc(f.soldPrice) : ''}</small></span>` : ''}
+          </button><div class="plank"></div><div class="name">${esc(f.name)}</div></div>`).join('');
+      for (let k = fs.length; k < total; k++)
+        html += `<div class="slot empty"><button class="fig" data-add="${c.id}" aria-label="新增收藏">＋</button><div class="plank"></div><div class="name"></div></div>`;
+      return `<section class="panel" style="--c:${c.color}"><div class="case"><div class="grid">${html}</div></div></section>`;
+    }).join('');
+    track.scrollLeft = cur * track.clientWidth;
+    updateHeader(true);
+  }
+
+  function updateHeader(force){
+    const c = cabinets[cur];
+    const h = $('#ipTitle');
+    const name = c ? c.name : '公仔收藏櫃';
+    if (h.textContent !== name || force){
+      h.textContent = name;
+      h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
+    }
+    if (c){
+      const fs = figsOf(c.id), sold = fs.filter(isSold).length;
+      $('#ipCount').textContent = `${fs.length} 件收藏${sold ? `・已賣出 ${sold} 件` : ''}`;
+    }else $('#ipCount').textContent = '';
+    document.documentElement.style.setProperty('--c', c ? c.color : COLORS[0]);
+    $('#prevBtn').disabled = !c || cur === 0;
+    $('#nextBtn').disabled = !c || cur === cabinets.length - 1;
+    $('#fab').hidden = !c;
+    $('#dots').innerHTML = cabinets.length > 1
+      ? cabinets.map((x,i) => `<button class="dot ${i === cur ? 'on' : ''}" data-i="${i}" aria-label="${esc(x.name)}"></button>`).join('')
+      : '';
+  }
+
+  function goTo(i, smooth = true){
+    i = Math.max(0, Math.min(i, cabinets.length - 1));
+    track.scrollTo({ left:i * track.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+    if (i !== cur){ cur = i; updateHeader(); }
+  }
+
+  let raf = 0;
+  track.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const i = Math.round(track.scrollLeft / track.clientWidth);
+      if (i !== cur && i >= 0 && i < cabinets.length){ cur = i; updateHeader(); }
+    });
+  }, { passive:true });
+
+  window.addEventListener('resize', () => {
+    if (cols() !== lastCols) render();
+    else track.scrollLeft = cur * track.clientWidth;
+  });
+
+  track.addEventListener('click', e => {
+    const f = e.target.closest('[data-fig]'); if (f) return openDetail(f.dataset.fig);
+    const a = e.target.closest('[data-add]'); if (a) return openFigureForm(null, a.dataset.add);
+  });
+  $('#dots').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) goTo(+d.dataset.i); });
+  $('#prevBtn').onclick = () => goTo(cur - 1);
+  $('#nextBtn').onclick = () => goTo(cur + 1);
+  $('#fab').onclick = () => openFigureForm(null, cabinets[cur]?.id);
+  document.addEventListener('keydown', e => {
+    if (document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft') goTo(cur - 1);
+    if (e.key === 'ArrowRight') goTo(cur + 1);
+  });
+
+  /* ---------- 對話框共用 ---------- */
+  document.querySelectorAll('dialog').forEach(d => {
+    d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+  });
+  let toastT;
+  function toast(msg){
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ---------- 收藏詳情 ---------- */
+  let detailId = null;
+  function fmtDate(s){
+    if (!s) return '';
+    const [y,m,d] = s.split('-').map(Number);
+    return `${y} 年 ${m} 月 ${d} 日`;
+  }
+  function daysSince(s){
+    if (!s) return null;
+    const [y,m,d] = s.split('-').map(Number);
+    const t = new Date(); t.setHours(0,0,0,0);
+    return Math.round((t - new Date(y, m-1, d)) / 86400000);
+  }
+  function openDetail(id){
+    const f = figures.find(x => x.id === id); if (!f) return;
+    detailId = id;
+    const cab = cabinets.find(c => c.id === f.cabinetId);
+    $('#detailDlg').style.setProperty('--c', cab?.color || COLORS[0]);
+    $('#dImg').src = photoURL(f);
+    $('#dImg').parentElement.style.display = f.photo ? '' : 'none';
+    $('#dName').textContent = f.name;
+    $('#dCab').textContent = cab?.name || '';
+    const days = daysSince(f.date);
+    const rows = [
+      ['入手日期', f.date ? `${esc(fmtDate(f.date))}${days !== null && days >= 0 ? `<div class="days">已經陪你 ${days} 天了</div>` : ''}` : ''],
+      ['取得方式', esc(f.method)],
+      ['入手地點', esc(f.place)],
+      ['價格', esc(f.price)],
+      ['小故事', esc(f.note)],
+    ].filter(r => r[1]);
+    $('#dInfo').innerHTML = rows.length
+      ? rows.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
+      : `<dt></dt><dd class="days">還沒有填寫詳細資料</dd>`;
+    $('#dSold').hidden = !isSold(f);
+    if (isSold(f)) $('#dSoldText').textContent = `${fmtMonth(f.soldMonth)} 賣出${f.soldPrice ? '・' + f.soldPrice : ''}`;
+    $('#dSell').textContent = isSold(f) ? '✏️ 修改賣出資訊' : '💔 忍痛賣出';
+    if (!$('#detailDlg').open) $('#detailDlg').showModal();
+  }
+
+  /* ---------- 忍痛賣出 ---------- */
+  const sellForm = $('#sellForm');
+  $('#dSell').onclick = () => {
+    const f = figures.find(x => x.id === detailId); if (!f) return;
+    sellForm.reset();
+    $('#sfTitle').textContent = isSold(f) ? '修改賣出資訊' : '忍痛賣出 💔';
+    $('#sellWho').textContent = f.name;
+    sellForm.month.value = f.soldMonth || today().slice(0,7);
+    sellForm.price.value = f.soldPrice || '';
+    $('#sUndo').hidden = !isSold(f);
+    $('#sellDlg').showModal();
+  };
+  async function saveFig(rec, msg){
+    try{ await put('figures', rec); }catch{ toast('儲存失敗'); return false; }
+    figures[figures.findIndex(x => x.id === rec.id)] = rec;
+    render(); openDetail(rec.id); toast(msg);
+    return true;
+  }
+  sellForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = figures.find(x => x.id === detailId); if (!f) return;
+    const month = normMonth(sellForm.month.value);
+    if (!month){ toast('月份格式像這樣：2026-10'); return; }
+    const price = sellForm.price.value.trim();
+    if (!price){ toast('填一下賣出金額吧'); return; }
+    const was = isSold(f);
+    if (await saveFig({ ...f, soldMonth:month, soldPrice:price }, was ? '已更新賣出資訊' : '掛上賣出牌了，辛苦了 🥲'))
+      $('#sellDlg').close();
+  });
+  $('#sUndo').onclick = async () => {
+    const f = figures.find(x => x.id === detailId); if (!f) return;
+    if (!confirm(`要取消「${f.name}」的賣出紀錄，讓它回到收藏狀態嗎？`)) return;
+    const { soldMonth, soldPrice, ...rest } = f;
+    if (await saveFig(rest, '已取消賣出，歡迎回家 🏠')) $('#sellDlg').close();
+  };
+  $('#dEdit').onclick = () => {
+    const f = figures.find(x => x.id === detailId);
+    $('#detailDlg').close();
+    if (f) openFigureForm(f);
+  };
+  $('#dDelete').onclick = async () => {
+    const f = figures.find(x => x.id === detailId); if (!f) return;
+    if (!confirm(`確定要把「${f.name}」從櫃子拿下來嗎？（會刪除這筆紀錄）`)) return;
+    await del('figures', f.id);
+    figures = figures.filter(x => x.id !== f.id);
+    dropURL(f.id);
+    $('#detailDlg').close(); render(); toast('已移除');
+  };
+
+  /* ---------- 新增 / 編輯收藏 ---------- */
+  let editing = null, pendingBlob = null, previewURL = '';
+  const figForm = $('#figForm');
+
+  $('#methodChips').innerHTML = METHODS.map(m => `<button type="button" class="chip" data-m="${esc(m)}">${esc(m)}</button>`).join('');
+  function markChips(){
+    const v = figForm.method.value.trim();
+    document.querySelectorAll('#methodChips .chip').forEach(c => c.classList.toggle('on', c.dataset.m === v));
+  }
+  $('#methodChips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    figForm.method.value = figForm.method.value === c.dataset.m ? '' : c.dataset.m;
+    markChips();
+  });
+  figForm.method.addEventListener('input', markChips);
+
+  function setPreview(url){
+    const p = $('#photoPick');
+    $('#photoPreview').src = url || '';
+    p.classList.toggle('has', !!url);
+  }
+  function openFigureForm(fig, cabId){
+    if (!cabinets.length){ openCabinetForm(); return; }
+    editing = fig || null; pendingBlob = null;
+    if (previewURL){ URL.revokeObjectURL(previewURL); previewURL = ''; }
+    figForm.reset();
+    $('#ffTitle').textContent = fig ? '編輯收藏' : '新增收藏';
+    $('#figSave').textContent = fig ? '儲存' : '放上櫃子';
+    figForm.cabinet.innerHTML = cabinets.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    figForm.cabinet.value = fig ? fig.cabinetId : (cabId || cabinets[cur].id);
+    figForm.name.value = fig?.name || '';
+    figForm.date.value = fig ? (fig.date || '') : today();
+    figForm.method.value = fig?.method || '';
+    figForm.place.value = fig?.place || '';
+    figForm.price.value = fig?.price || '';
+    figForm.note.value = fig?.note || '';
+    setPreview(fig?.photo ? photoURL(fig) : '');
+    markChips();
+    $('#figDlg').showModal();
+  }
+
+  const photoInput = $('#photoInput');
+  $('#photoPick').onclick = () => photoInput.click();
+  $('#photoPick').onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); photoInput.click(); } };
+  photoInput.onchange = async () => {
+    const file = photoInput.files[0]; photoInput.value = '';
+    if (!file) return;
+    try{
+      pendingBlob = await compress(file);
+      if (previewURL) URL.revokeObjectURL(previewURL);
+      previewURL = URL.createObjectURL(pendingBlob);
+      setPreview(previewURL);
+    }catch{ toast('這張照片讀不到，換一張試試'); }
+  };
+
+  function loadImg(file){
+    return new Promise((res, rej) => {
+      const u = URL.createObjectURL(file), img = new Image();
+      img.onload = () => { URL.revokeObjectURL(u); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('image')); };
+      img.src = u;
+    });
+  }
+  async function compress(file, max = 1400, q = .86){
+    const img = await loadImg(file);
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', q));
+  }
+
+  figForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const photo = pendingBlob || editing?.photo || null;
+    if (!photo){ toast('先選一張照片吧 📷'); return; }
+    const rec = {
+      ...(editing || { id:uid(), created:Date.now() }),
+      cabinetId: figForm.cabinet.value,
+      name: figForm.name.value.trim(),
+      date: figForm.date.value,
+      method: figForm.method.value.trim(),
+      place: figForm.place.value.trim(),
+      price: figForm.price.value.trim(),
+      note: figForm.note.value.trim(),
+      photo,
+    };
+    try{ await put('figures', rec); }catch{ toast('儲存失敗，可能是瀏覽器空間不足'); return; }
+    const i = figures.findIndex(x => x.id === rec.id);
+    if (i >= 0) figures[i] = rec; else figures.push(rec);
+    if (previewURL){ URL.revokeObjectURL(previewURL); previewURL = ''; }
+    $('#figDlg').close();
+    cur = Math.max(0, cabinets.findIndex(c => c.id === rec.cabinetId));
+    render();
+    toast(editing ? '已更新' : '已放上櫃子 ✨');
+  });
+
+  /* ---------- 櫃子 ---------- */
+  let editingCab = null, pickedColor = COLORS[0];
+  const cabForm = $('#cabForm');
+  function drawSwatches(){
+    $('#swatches').innerHTML = COLORS.map(c =>
+      `<button type="button" class="sw ${c === pickedColor ? 'on' : ''}" data-c="${c}" style="background:${c}" aria-label="顏色 ${c}"></button>`).join('');
+  }
+  $('#swatches').addEventListener('click', e => {
+    const s = e.target.closest('.sw'); if (!s) return;
+    pickedColor = s.dataset.c; drawSwatches();
+  });
+  function openCabinetForm(cab){
+    editingCab = cab || null;
+    cabForm.reset();
+    $('#cfTitle').textContent = cab ? '編輯櫃子' : '新增櫃子';
+    cabForm.name.value = cab?.name || '';
+    pickedColor = cab?.color || COLORS[cabinets.length % COLORS.length];
+    drawSwatches();
+    $('#cabDlg').showModal();
+  }
+  cabForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = cabForm.name.value.trim(); if (!name) return;
+    let rec;
+    if (editingCab){
+      rec = { ...editingCab, name, color:pickedColor };
+      cabinets[cabinets.findIndex(c => c.id === rec.id)] = rec;
+    }else{
+      rec = { id:uid(), name, color:pickedColor, order:(cabinets.at(-1)?.order ?? -1) + 1 };
+      cabinets.push(rec);
+      cur = cabinets.length - 1;
+    }
+    await put('cabinets', rec);
+    $('#cabDlg').close(); render();
+    toast(editingCab ? '櫃子已更新' : `「${name}」櫃子建好了`);
+  });
+
+  async function moveCab(dir){
+    const j = cur + dir; if (j < 0 || j >= cabinets.length) return;
+    [cabinets[cur], cabinets[j]] = [cabinets[j], cabinets[cur]];
+    cabinets.forEach((c,i) => c.order = i);
+    await Promise.all([put('cabinets', cabinets[cur]), put('cabinets', cabinets[j])]);
+    cur = j; render();
+  }
+  async function deleteCab(){
+    const c = cabinets[cur]; if (!c) return;
+    const fs = figsOf(c.id);
+    if (!confirm(`確定刪除「${c.name}」櫃子嗎？${fs.length ? `\n裡面的 ${fs.length} 件收藏也會一起刪除。` : ''}`)) return;
+    for (const f of fs){ await del('figures', f.id); dropURL(f.id); }
+    await del('cabinets', c.id);
+    figures = figures.filter(f => f.cabinetId !== c.id);
+    cabinets = cabinets.filter(x => x.id !== c.id);
+    cur = Math.max(0, cur - 1); render(); toast('櫃子已刪除');
+  }
+
+  /* ---------- 備份 ---------- */
+  const blobToDataURL = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+  async function exportData(){
+    toast('打包中…');
+    const out = { app:'figure-cabinet', version:1, exported:new Date().toISOString(), cabinets, figures:[] };
+    for (const f of figures) out.figures.push({ ...f, photo: f.photo ? await blobToDataURL(f.photo) : null });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type:'application/json' }));
+    a.download = `公仔收藏備份-${today()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('備份已下載');
+  }
+  $('#importFile').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      if (!Array.isArray(data.cabinets) || !Array.isArray(data.figures)) throw new Error('format');
+      if (!confirm(`要匯入 ${data.cabinets.length} 個櫃子、${data.figures.length} 件收藏嗎？\n相同的項目會被備份裡的版本取代。`)) return;
+      toast('匯入中…');
+      for (const c of data.cabinets) await put('cabinets', c);
+      for (const f of data.figures){
+        const photo = f.photo ? await (await fetch(f.photo)).blob() : null;
+        await put('figures', { ...f, photo });
+      }
+      await load(); cur = 0; render(); toast('匯入完成');
+    }catch{ toast('這個檔案不是收藏櫃的備份'); }
+  };
+
+  /* ---------- 選單 ---------- */
+  $('#menuBtn').onclick = () => {
+    const has = cabinets.length > 0;
+    document.querySelectorAll('#menuDlg [data-need]').forEach(b => b.disabled = !has);
+    document.querySelector('[data-act="moveLeft"]').disabled = !has || cur === 0;
+    document.querySelector('[data-act="moveRight"]').disabled = !has || cur === cabinets.length - 1;
+    $('#menuDlg').showModal();
+  };
+  $('#menuDlg').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    $('#menuDlg').close();
+    ({
+      addCab: () => openCabinetForm(),
+      editCab: () => openCabinetForm(cabinets[cur]),
+      moveLeft: () => moveCab(-1),
+      moveRight: () => moveCab(1),
+      delCab: deleteCab,
+      export: exportData,
+      import: () => $('#importFile').click(),
+    })[b.dataset.act]?.();
+  });
+
+  /* ---------- 淺色 / 深色切換 ---------- */
+  function applyTheme(t){
+    document.documentElement.dataset.theme = t;
+    $('#themeBtn').textContent = t === 'light' ? '🌙' : '☀️';
+    $('#themeBtn').title = t === 'light' ? '切換到深色' : '切換到淺色';
+    document.querySelector('meta[name="theme-color"]').content = t === 'light' ? '#fbf8f1' : '#1b1512';
+  }
+  applyTheme(document.documentElement.dataset.theme || 'dark');
+  $('#themeBtn').onclick = () => {
+    const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    applyTheme(t);
+    try{ localStorage.setItem('figure-theme', t); }catch{}
+  };
+
+  /* ---------- 啟動 ---------- */
+  (async () => {
+    try{ db = await openDB(); }
+    catch{ db = null; setTimeout(() => toast('這個瀏覽器無法長期儲存，資料重新整理後會消失'), 400); }
+    try{ navigator.storage?.persist?.(); }catch{}
+    await load();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
